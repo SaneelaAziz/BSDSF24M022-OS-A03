@@ -32,32 +32,53 @@ char** tokenize(char* cmdline) {
     }
 
     char* cp = cmdline;
-    char* start;
-    int len;
     int argnum = 0;
 
     while (*cp != '\0' && argnum < MAXARGS) {
-        while (*cp == ' ' || *cp == '\t') cp++; // Skip leading whitespace
-        
-        if (*cp == '\0') break; // Line was only whitespace
+        while (*cp == ' ' || *cp == '\t') cp++;   // skip whitespace
+        if (*cp == '\0') break;
 
-        start = cp;
-        len = 1;
-        while (*++cp != '\0' && !(*cp == ' ' || *cp == '\t')) {
-            len++;
+        // Operators <, > and | are tokens on their own, spaces or not
+        if (*cp == '<' || *cp == '>' || *cp == '|') {
+            arglist[argnum][0] = *cp;
+            arglist[argnum][1] = '\0';
+            argnum++;
+            cp++;
+            continue;
         }
-        strncpy(arglist[argnum], start, len);
+
+        // Ordinary word: stops at whitespace or an operator.
+        // Text inside double quotes is kept together, quotes removed.
+        int len = 0;
+        while (*cp != '\0' && *cp != ' ' && *cp != '\t' &&
+               *cp != '<' && *cp != '>' && *cp != '|') {
+            if (*cp == '"') {
+                cp++;
+                while (*cp != '\0' && *cp != '"') {
+                    if (len < ARGLEN - 1) arglist[argnum][len++] = *cp;
+                    cp++;
+                }
+                if (*cp == '"') cp++;
+            } else {
+                if (len < ARGLEN - 1) arglist[argnum][len++] = *cp;
+                cp++;
+            }
+        }
         arglist[argnum][len] = '\0';
         argnum++;
     }
 
-    if (argnum == 0) { // No arguments were parsed
-        for(int i = 0; i < MAXARGS + 1; i++) free(arglist[i]);
+    if (argnum == 0) {   // nothing parsed
+        for (int i = 0; i < MAXARGS + 1; i++) free(arglist[i]);
         free(arglist);
         return NULL;
     }
 
-    arglist[argnum] = NULL;
+    // Free the unused slots and terminate the list with NULL
+    for (int i = argnum; i <= MAXARGS; i++) {
+        free(arglist[i]);
+        arglist[i] = NULL;
+    }
     return arglist;
 }
 
