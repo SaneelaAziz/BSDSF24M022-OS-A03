@@ -26,5 +26,6 @@ const char* get_history_entry(int n);
 void add_job(pid_t pid, const char* cmd);
 void reap_jobs(void);
 void print_jobs(void);
+extern int last_status;   // exit status of the last foreground command
 
 #endif // SHELL_H

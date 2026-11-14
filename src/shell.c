@@ -102,6 +102,7 @@ int handle_builtin(char** arglist) {
         }
         if (target == NULL || chdir(target) != 0) {
             perror("cd");
+            last_status = 1;
         }
         return 1;
     }
@@ -218,3 +219,7 @@ void print_jobs(void) {
         printf("[%d]  %d  Running  %s\n", jobs[i].id, (int) jobs[i].pid, jobs[i].cmd);
     }
 }
+
+
+// Exit status of the last foreground command (used by if-then-else-fi)
+int last_status = 0;

@@ -57,6 +57,7 @@ int execute(char** arglist, int background) {
     pid_t pids[MAX_CMDS];
     int ncmds = parse_commands(arglist, cmds);
     if (ncmds < 0) {
+        last_status = 1;
         return -1;
     }
 
@@ -126,9 +127,14 @@ int execute(char** arglist, int background) {
         return 0;
     }
 
-    int status;
+    int status = 0;
     for (int i = 0; i < started; i++) {
-        waitpid(pids[i], &status, 0);
+        waitpid(pids[i], &status, 0);   // status ends as the LAST command's status
     }
-    return 0;
+    if (started < ncmds) {
+        last_status = 1;   // a fork failed
+    } else {
+        last_status = WIFEXITED(status) ? WEXITSTATUS(status) : 1;
+    }
+    return last_status;
 }
