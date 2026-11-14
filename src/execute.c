@@ -52,7 +52,7 @@ static int parse_commands(char** arglist, command_t* cmds) {
     return n + 1;
 }
 
-int execute(char** arglist) {
+int execute(char** arglist, int background) {
     command_t cmds[MAX_CMDS];
     pid_t pids[MAX_CMDS];
     int ncmds = parse_commands(arglist, cmds);
@@ -114,6 +114,17 @@ int execute(char** arglist) {
     }
 
     if (prev_read != -1) close(prev_read);
+
+    if (background && started > 0) {
+        // Do not wait: remember the last process of the pipeline as the job
+        char text[128] = "";
+        for (int i = 0; arglist[i] != NULL; i++) {
+            if (i > 0) strncat(text, " ", sizeof(text) - strlen(text) - 1);
+            strncat(text, arglist[i], sizeof(text) - strlen(text) - 1);
+        }
+        add_job(pids[started - 1], text);
+        return 0;
+    }
 
     int status;
     for (int i = 0; i < started; i++) {

@@ -39,7 +39,7 @@ char** tokenize(char* cmdline) {
         if (*cp == '\0') break;
 
         // Operators <, > and | are tokens on their own, spaces or not
-        if (*cp == '<' || *cp == '>' || *cp == '|') {
+        if (*cp == '<' || *cp == '>' || *cp == '|' || *cp == ';' || *cp == '&') {
             arglist[argnum][0] = *cp;
             arglist[argnum][1] = '\0';
             argnum++;
@@ -51,7 +51,7 @@ char** tokenize(char* cmdline) {
         // Text inside double quotes is kept together, quotes removed.
         int len = 0;
         while (*cp != '\0' && *cp != ' ' && *cp != '\t' &&
-               *cp != '<' && *cp != '>' && *cp != '|') {
+               *cp != '<' && *cp != '>' && *cp != '|' && *cp != ';' && *cp != '&') {
             if (*cp == '"') {
                 cp++;
                 while (*cp != '\0' && *cp != '"') {
@@ -112,12 +112,12 @@ int handle_builtin(char** arglist) {
         printf("  exit            Exit the shell\n");
         printf("  help            Show this help message\n");
         printf("  history         Show command history\n");
-        printf("  jobs            List background jobs (not yet implemented)\n");
+        printf("  jobs            List running background jobs\n");
         return 1;
     }
 
     if (strcmp(arglist[0], "jobs") == 0) {
-        printf("Job control not yet implemented.\n");
+        print_jobs();
         return 1;
     }
 
@@ -161,4 +161,60 @@ const char* get_history_entry(int n) {
         return NULL;
     }
     return hist[n - 1];
+}
+
+
+// ---- Background jobs ----
+#define MAX_JOBS 32
+
+typedef struct {
+    pid_t pid;
+    int id;
+    char cmd[128];
+} job_t;
+
+static job_t jobs[MAX_JOBS];
+static int job_count = 0;
+static int next_job_id = 1;
+
+void add_job(pid_t pid, const char* cmd) {
+    if (job_count == MAX_JOBS) {
+        fprintf(stderr, "too many background jobs\n");
+        return;
+    }
+    jobs[job_count].pid = pid;
+    jobs[job_count].id = next_job_id++;
+    strncpy(jobs[job_count].cmd, cmd, sizeof(jobs[job_count].cmd) - 1);
+    jobs[job_count].cmd[sizeof(jobs[job_count].cmd) - 1] = '\0';
+    printf("[%d] %d\n", jobs[job_count].id, (int) pid);
+    job_count++;
+}
+
+// Collect finished children so they do not stay as zombies.
+// WNOHANG makes waitpid() return immediately when nothing has finished.
+void reap_jobs(void) {
+    int status;
+    pid_t pid;
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        for (int i = 0; i < job_count; i++) {
+            if (jobs[i].pid == pid) {
+                printf("[%d]  Done    %s\n", jobs[i].id, jobs[i].cmd);
+                for (int j = i + 1; j < job_count; j++) {
+                    jobs[j - 1] = jobs[j];   // remove it from the list
+                }
+                job_count--;
+                break;
+            }
+        }
+    }
+}
+
+void print_jobs(void) {
+    if (job_count == 0) {
+        printf("No background jobs.\n");
+        return;
+    }
+    for (int i = 0; i < job_count; i++) {
+        printf("[%d]  %d  Running  %s\n", jobs[i].id, (int) jobs[i].pid, jobs[i].cmd);
+    }
 }

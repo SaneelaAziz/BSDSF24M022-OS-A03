@@ -2,13 +2,54 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
+// Run one command: a built-in in the shell itself, otherwise fork and exec
+static void run_segment(char** seg, int background) {
+    if (!handle_builtin(seg)) {
+        execute(seg, background);
+    }
+}
+
+// Split the token list at ';' and '&' and run the commands one after another.
+// A command followed by '&' runs in the background (the shell does not wait).
+static void run_line(char** arglist) {
+    char* seg[MAXARGS + 1];
+    int n = 0;
+
+    for (int i = 0; arglist[i] != NULL; i++) {
+        int is_semi = (strcmp(arglist[i], ";") == 0);
+        int is_amp  = (strcmp(arglist[i], "&") == 0);
+
+        if (is_semi || is_amp) {
+            if (n == 0) {
+                fprintf(stderr, "syntax error near unexpected token '%s'\n", arglist[i]);
+                return;
+            }
+            seg[n] = NULL;
+            run_segment(seg, is_amp);
+            n = 0;
+        } else {
+            seg[n++] = arglist[i];
+        }
+    }
+
+    if (n > 0) {   // last command, no separator after it
+        seg[n] = NULL;
+        run_segment(seg, 0);
+    }
+}
+
 int main() {
     char* cmdline;
     char** arglist;
 
-    // readline() prints the prompt, handles line editing, arrow keys
-    // and Tab completion (filenames by default)
-    while ((cmdline = readline(PROMPT)) != NULL) {
+    while (1) {
+        reap_jobs();   // collect finished background jobs (no zombies)
+
+        cmdline = readline(PROMPT);
+        if (cmdline == NULL) {
+            break;     // Ctrl+D
+        }
+
         // !n: replace the line with the n-th command from history
         if (cmdline[0] == '!') {
             char* end;
@@ -32,10 +73,7 @@ int main() {
             add_history_entry(cmdline);   // our array: history and !n
             add_history(cmdline);         // readline: Up/Down arrow keys
 
-            // Only fork and exec if the command is not a built-in
-            if (!handle_builtin(arglist)) {
-                execute(arglist);
-            }
+            run_line(arglist);
 
             // Free the memory allocated by tokenize()
             for (int i = 0; arglist[i] != NULL; i++) {
