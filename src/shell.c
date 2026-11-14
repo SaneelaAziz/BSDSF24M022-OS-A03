@@ -90,6 +90,7 @@ int handle_builtin(char** arglist) {
         printf("  cd <directory>  Change the current directory\n");
         printf("  exit            Exit the shell\n");
         printf("  help            Show this help message\n");
+        printf("  history         Show command history\n");
         printf("  jobs            List background jobs (not yet implemented)\n");
         return 1;
     }
@@ -99,5 +100,44 @@ int handle_builtin(char** arglist) {
         return 1;
     }
 
+    if (strcmp(arglist[0], "history") == 0) {
+        print_history();
+        return 1;
+    }
+
     return 0;   // not a built-in
+}
+
+
+// ---- Command history storage ----
+static char* hist[HISTORY_SIZE];
+static int hist_count = 0;
+
+void add_history_entry(const char* cmd) {
+    if (cmd == NULL || cmd[0] == '\0') {
+        return;
+    }
+    // History full: drop the oldest entry and shift the rest left
+    if (hist_count == HISTORY_SIZE) {
+        free(hist[0]);
+        for (int i = 1; i < HISTORY_SIZE; i++) {
+            hist[i - 1] = hist[i];
+        }
+        hist_count--;
+    }
+    hist[hist_count++] = strdup(cmd);
+}
+
+void print_history(void) {
+    for (int i = 0; i < hist_count; i++) {
+        printf("%d  %s\n", i + 1, hist[i]);
+    }
+}
+
+// n is 1-based, matching the numbers shown by "history"
+const char* get_history_entry(int n) {
+    if (n < 1 || n > hist_count) {
+        return NULL;
+    }
+    return hist[n - 1];
 }
