@@ -1,10 +1,14 @@
 #include "shell.h"
+#include <readline/readline.h>
+#include <readline/history.h>
 
 int main() {
     char* cmdline;
     char** arglist;
 
-    while ((cmdline = read_cmd(PROMPT, stdin)) != NULL) {
+    // readline() prints the prompt, handles line editing, arrow keys
+    // and Tab completion (filenames by default)
+    while ((cmdline = readline(PROMPT)) != NULL) {
         // !n: replace the line with the n-th command from history
         if (cmdline[0] == '!') {
             char* end;
@@ -25,7 +29,8 @@ int main() {
         }
 
         if ((arglist = tokenize(cmdline)) != NULL) {
-            add_history_entry(cmdline);
+            add_history_entry(cmdline);   // our array: history and !n
+            add_history(cmdline);         // readline: Up/Down arrow keys
 
             // Only fork and exec if the command is not a built-in
             if (!handle_builtin(arglist)) {
