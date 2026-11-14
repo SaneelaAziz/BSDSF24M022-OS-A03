@@ -60,3 +60,44 @@ char** tokenize(char* cmdline) {
     arglist[argnum] = NULL;
     return arglist;
 }
+
+int handle_builtin(char** arglist) {
+    if (arglist == NULL || arglist[0] == NULL) {
+        return 0;
+    }
+
+    // exit: terminate the shell process itself
+    if (strcmp(arglist[0], "exit") == 0) {
+        printf("Shell exited.\n");
+        exit(0);
+    }
+
+    // cd: must run in the shell process, because chdir() changes
+    // the working directory of the process that calls it
+    if (strcmp(arglist[0], "cd") == 0) {
+        const char* target = arglist[1];
+        if (target == NULL) {
+            target = getenv("HOME");   // plain "cd" goes home
+        }
+        if (target == NULL || chdir(target) != 0) {
+            perror("cd");
+        }
+        return 1;
+    }
+
+    if (strcmp(arglist[0], "help") == 0) {
+        printf("Built-in commands:\n");
+        printf("  cd <directory>  Change the current directory\n");
+        printf("  exit            Exit the shell\n");
+        printf("  help            Show this help message\n");
+        printf("  jobs            List background jobs (not yet implemented)\n");
+        return 1;
+    }
+
+    if (strcmp(arglist[0], "jobs") == 0) {
+        printf("Job control not yet implemented.\n");
+        return 1;
+    }
+
+    return 0;   // not a built-in
+}
