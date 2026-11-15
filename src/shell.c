@@ -82,9 +82,84 @@ char** tokenize(char* cmdline) {
     return arglist;
 }
 
+// ---- Shell variables (singly linked list of name/value pairs) ----
+typedef struct var {
+    char* name;
+    char* value;
+    struct var* next;
+} var_t;
+
+static var_t* var_head = NULL;
+
+// Create the variable, or update its value if it already exists
+void set_var(const char* name, const char* value) {
+    for (var_t* v = var_head; v != NULL; v = v->next) {
+        if (strcmp(v->name, name) == 0) {
+            char* copy = strdup(value);
+            free(v->value);
+            v->value = copy;
+            return;
+        }
+    }
+    var_t* v = malloc(sizeof(var_t));
+    v->name = strdup(name);
+    v->value = strdup(value);
+    v->next = NULL;
+    if (var_head == NULL) {
+        var_head = v;
+    } else {
+        var_t* t = var_head;
+        while (t->next != NULL) t = t->next;
+        t->next = v;          // append, so "set" prints in creation order
+    }
+}
+
+const char* get_var(const char* name) {
+    for (var_t* v = var_head; v != NULL; v = v->next) {
+        if (strcmp(v->name, name) == 0) {
+            return v->value;
+        }
+    }
+    return NULL;
+}
+
+void print_vars(void) {
+    for (var_t* v = var_head; v != NULL; v = v->next) {
+        printf("%s=%s\n", v->name, v->value);
+    }
+}
+
+// A valid assignment token looks like NAME=value: NAME starts with a letter
+// or '_' and continues with letters, digits or '_'
+static int is_assignment(const char* tok) {
+    if (!(isalpha((unsigned char) tok[0]) || tok[0] == '_')) {
+        return 0;
+    }
+    int i = 1;
+    while (isalnum((unsigned char) tok[i]) || tok[i] == '_') {
+        i++;
+    }
+    return tok[i] == '=';
+}
+
 int handle_builtin(char** arglist) {
     if (arglist == NULL || arglist[0] == NULL) {
         return 0;
+    }
+
+    // NAME=value: variable assignment, handled inside the shell (no fork)
+    if (arglist[1] == NULL && is_assignment(arglist[0])) {
+        char* eq = strchr(arglist[0], '=');
+        *eq = '\0';                           // split into NAME and value
+        const char* value = eq + 1;
+        if (value[0] == '$' && value[1] != '\0') {   // NAME=$OTHER
+            const char* other = get_var(value + 1);
+            if (other == NULL) other = getenv(value + 1);
+            value = (other != NULL) ? other : "";
+        }
+        set_var(arglist[0], value);
+        *eq = '=';                            // restore the token
+        return 1;
     }
 
     // exit: terminate the shell process itself
@@ -119,6 +194,11 @@ int handle_builtin(char** arglist) {
 
     if (strcmp(arglist[0], "jobs") == 0) {
         print_jobs();
+        return 1;
+    }
+
+    if (strcmp(arglist[0], "set") == 0) {
+        print_vars();
         return 1;
     }
 

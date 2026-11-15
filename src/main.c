@@ -13,9 +13,29 @@ static void free_arglist(char** arglist) {
 
 // Run one command: a built-in in the shell itself, otherwise fork and exec
 static void run_segment(char** seg, int background) {
+    // Variable expansion: replace each word that starts with '$' by the
+    // variable's value. The new strings are owned here and freed below;
+    // the original tokens still belong to the caller's arglist.
+    char* owned[MAXARGS + 1];
+    int nowned = 0;
+    for (int i = 0; seg[i] != NULL; i++) {
+        if (seg[i][0] == '$' && seg[i][1] != '\0') {
+            const char* value = get_var(seg[i] + 1);
+            if (value == NULL) {
+                value = getenv(seg[i] + 1);   // fall back to the environment, e.g. $HOME
+            }
+            owned[nowned] = strdup(value != NULL ? value : "");
+            seg[i] = owned[nowned++];
+        }
+    }
+
     last_status = 0;                 // built-ins succeed unless they say otherwise
     if (!handle_builtin(seg)) {
         execute(seg, background);    // sets last_status for foreground commands
+    }
+
+    for (int i = 0; i < nowned; i++) {
+        free(owned[i]);
     }
 }
 

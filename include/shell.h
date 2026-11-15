@@ -8,10 +8,11 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <ctype.h>
 
 #define MAX_LEN 512
 #define MAXARGS 30
-#define ARGLEN 30
+#define ARGLEN 128
 #define PROMPT "FCIT> "
 #define HISTORY_SIZE 20
 
@@ -26,6 +27,9 @@ const char* get_history_entry(int n);
 void add_job(pid_t pid, const char* cmd);
 void reap_jobs(void);
 void print_jobs(void);
+void set_var(const char* name, const char* value);
+const char* get_var(const char* name);
+void print_vars(void);
 extern int last_status;   // exit status of the last foreground command
 
 #endif // SHELL_H
